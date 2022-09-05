@@ -31,7 +31,9 @@ Confidential data, secrets, other environment variables.
 ```bash
 arkade get run-job
 
-curl -SLs -f https://github.com/alexellis/run-job/blob/master/job.yaml -o /tmp/job.yaml
+curl -SLs \
+  -f https://raw.githubusercontent.com/openfaas/config-checker/master/job.yaml \
+  -o /tmp/job.yaml
 
 # Output to file with today's date
 run-job \
