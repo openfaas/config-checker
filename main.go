@@ -465,6 +465,10 @@ Features detected:
 		fmt.Printf("⚠️ Pro autoscaler detected, but cluster_role is disabled - unable to collect CPU/RAM metrics\n")
 	}
 
+	if controllerMode != "operator" {
+		fmt.Printf("⚠️ Operator mode is not enabled, OpenFaaS Pro customers should use the OpenFaaS operator\n")
+	}
+
 	if strings.Contains(gatewayImage, "openfaasltd") && len(autoscalerImage) == 0 {
 		fmt.Printf("⚠️ Pro gateway detected, but autoscaler is not enabled\n")
 	}
