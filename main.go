@@ -451,14 +451,27 @@ Features detected:
 	}
 
 	if len(autoscalerImage) > 0 && clusterRole == false {
-		fmt.Printf("⚠️ Autoscaler detected, but cluster_role is disabled - unable to collect CPU/RAM metrics\n")
+		fmt.Printf("⚠️ Pro autoscaler detected, but cluster_role is disabled - unable to collect CPU/RAM metrics\n")
 	}
 
 	if strings.Contains(gatewayImage, "openfaasltd") && len(autoscalerImage) == 0 {
 		fmt.Printf("⚠️ Pro gateway detected, but autoscaler is not enabled\n")
 	}
 
+	scalingDown := 0
 	for _, fn := range functions {
+
+		if fn.Scaling.GetZero() == "true" {
+			scalingDown++
+		}
+
+		if fn.Scaling.GetZeroDuration() != "<not set>" {
+			dur, err := time.ParseDuration(fn.Scaling.GetZeroDuration())
+			if err == nil && dur < time.Minute*5 {
+				fmt.Printf("⚠️ %s scales down after %.2f minutes, this may be too soon, 5 minutes or higher is recommended\n", fn.Name, dur.Minutes())
+			}
+		}
+
 		if len(fn.Timeout.ReadTimeout) == 0 {
 			fmt.Printf("⚠️ %s read_timeout is not set\n", fn.Name)
 		} else if fn.Timeout.GetReadTimeout() > gwUpstreamTimeout {
@@ -479,6 +492,9 @@ Features detected:
 		}
 	}
 
+	if len(functions) > 0 && scalingDown == 0 {
+		fmt.Printf("⚠️ no functions are configured to scale down, this may be inefficient\n")
+	}
 }
 
 func printFunction(fn Function, autoscaling bool) {
@@ -503,15 +519,24 @@ func printFunction(fn Function, autoscaling bool) {
 	}
 
 	if autoscaling {
+
 		if fn.Scaling == nil {
-			fmt.Fprintf(w, "\nNo scaling configuration was set\n")
+			fmt.Fprintf(w, "\nno scaling configuration was set\n")
 		} else {
-			fmt.Fprintf(w, "\n- %s\t%s\n", "scaling min/max", fmt.Sprintf("(%s / %s)", fn.Scaling.GetMin(), fn.Scaling.GetMax()))
-			fmt.Fprintf(w, "- %s\t%s\n", "scaling type", fn.Scaling.GetType())
-			fmt.Fprintf(w, "- %s\t%s\n", "scaling target", fn.Scaling.GetTarget())
-			fmt.Fprintf(w, "- %s\t%s\n", "scaling target-proportion", fn.Scaling.GetProportion())
-			fmt.Fprintf(w, "- %s\t%s\n", "scaling zero", fn.Scaling.GetZero())
-			fmt.Fprintf(w, "- %s\t%s\n", "scaling zero-duration", fn.Scaling.GetZeroDuration())
+			fmt.Fprintf(w, "\nscaling configuration\n")
+
+			fmt.Fprintf(w, "\n- %s\t%s\n", "min/max replicas", fmt.Sprintf("(%s / %s)", fn.Scaling.GetMin(), fn.Scaling.GetMax()))
+			fmt.Fprintf(w, "- %s\t%s\n", "type", fn.Scaling.GetType())
+			fmt.Fprintf(w, "- %s\t%s\n", "target", fn.Scaling.GetTarget())
+			fmt.Fprintf(w, "- %s\t%s\n", "target-proportion", fn.Scaling.GetProportion())
+			fmt.Fprintf(w, "\n")
+
+			if fn.Scaling.GetZero() == "<not set>" || fn.Scaling.GetZero() == "false" {
+				fmt.Fprintf(w, "- %s\t%s\n", "scale to zero", "disabled")
+			} else {
+				fmt.Fprintf(w, "- %s\t%s\n", "scale to zero", fn.Scaling.GetZero())
+				fmt.Fprintf(w, "- %s\t%s\n", "scale to zero duration", fn.Scaling.GetZeroDuration())
+			}
 		}
 	}
 
