@@ -1,6 +1,8 @@
-## OpenFaaS Pro Checker
+## Configuration Checker for OpenFaaS
 
 This is a diagnostic tool for OpenFaaS customers when working with our support team.
+
+It runs inside your cluster to make recommendations on the OpenFaaS core components and on your functions.
 
 ## How it works
 
