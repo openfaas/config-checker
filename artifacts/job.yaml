@@ -14,5 +14,6 @@ spec:
 
       containers:
       - name: checker
-        image: docker.io/alexellis2/openfaas-checker:0.0.1
+        image: ghcr.io/config-checker:latest
+        imagePullPolicy: Always
       restartPolicy: Never

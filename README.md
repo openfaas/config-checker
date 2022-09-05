@@ -2,6 +2,12 @@
 
 This is a diagnostic tool for OpenFaaS customers when working with our support team.
 
+## How it works
+
+You deploy a one-time Kubernetes job that runs some queries against the Kubernetes API using a limited RBAC definition. The results are printed to the pod's logs and it's completely offline. There is no call-home or data transferred to any third-party.
+
+You must email the results to us, or attach them to a Slack conversation.
+
 ## What's collected
 
 OpenFaaS core components:
