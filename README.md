@@ -4,7 +4,9 @@ This is a diagnostic tool for OpenFaaS customers when working with our support t
 
 ## How it works
 
-You deploy a one-time Kubernetes job that runs some queries against the Kubernetes API using a limited RBAC definition. The results are printed to the pod's logs and it's completely offline. There is no call-home or data transferred to any third-party.
+You deploy a one-time Kubernetes job that runs some queries against the Kubernetes API using [a limited RBAC definition](https://github.com/openfaas/config-checker/blob/master/artifacts/rbac.yaml). The results are printed to the pod's logs.
+
+It's completely offline. There is no call-home or data transferred to any third-party.
 
 You must email the results to us, or attach them to a Slack conversation.
 
@@ -31,8 +33,13 @@ Confidential data, secrets, other environment variables.
 Download [run-job from GitHub](https://github.com/alexellis/run-job) or [use "arkade get"](https://arkade.dev/)
 
 ```bash
+# Apply the RBAC file
+https://raw.githubusercontent.com/openfaas/config-checker/master/artifacts/rbac.yaml
+
+# Install run-job to run the job and collect the results
 arkade get run-job
 
+# Download the job definition
 curl -SLs \
   -f https://raw.githubusercontent.com/openfaas/config-checker/master/job.yaml \
   -o /tmp/job.yaml
