@@ -151,10 +151,12 @@ func main() {
 	// Load KUBECONFIG / clientset
 
 	var (
-		kubeconfig string
+		kubeconfig            string
+		openfaasCoreNamespace string
 	)
 
 	flag.StringVar(&kubeconfig, "kubeconfig", "$HOME/.kube/config", "Path to KUBECONFIG")
+	flag.StringVar(&openfaasCoreNamespace, "openfaas-namespace", "openfaas", "Namespace for the OpenFaaS installation")
 	flag.Parse()
 
 	clientset, err := getClientset(kubeconfig)
@@ -172,6 +174,33 @@ func main() {
 	}
 
 	fmt.Printf("OpenFaaS Pro Report\n")
+
+	namespaces, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	istioDetected := false
+
+	openfaasCoreNamespaceDetected := false
+	functionNamespaces := []string{"openfaas-fn"}
+
+	for _, n := range namespaces.Items {
+		if n.Name == openfaasCoreNamespace {
+			openfaasCoreNamespaceDetected = true
+		}
+		if n.Name == "istio-system" {
+			istioDetected = true
+		}
+
+		if _, ok := n.Annotations["openfaas"]; ok {
+			functionNamespaces = append(functionNamespaces, n.Name)
+		}
+	}
+
+	if !openfaasCoreNamespaceDetected {
+		log.Fatalf("OpenFaaS Core namespace \"%s\" not found. Exiting", openfaasCoreNamespace)
+	}
 
 	gatewayReplicas := 0
 	gatewayTimeout := newTimeout()
@@ -290,24 +319,6 @@ func main() {
 					dashboardImage = container.Image
 				}
 			}
-		}
-	}
-
-	namespaces, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
-
-	istioDetected := false
-	functionNamespaces := []string{"openfaas-fn"}
-
-	for _, n := range namespaces.Items {
-		if n.Name == "istio-system" {
-			istioDetected = true
-		}
-
-		if _, ok := n.Annotations["openfaas"]; ok {
-			functionNamespaces = append(functionNamespaces, n.Name)
 		}
 	}
 
