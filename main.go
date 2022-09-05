@@ -343,7 +343,6 @@ func main() {
 	fmt.Printf("queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
 	fmt.Printf("\n")
 	fmt.Printf("\nFunction namespaces: %v\n\n", strings.TrimRight(strings.Join(functionNamespaces, ", "), ","))
-	fmt.Printf("\n")
 
 	if len(autoscalerImage) > 0 {
 		fmt.Printf("\nautoscaler\n\n")
@@ -507,8 +506,7 @@ func printFunction(fn Function, autoscaling bool) {
 		if fn.Scaling == nil {
 			fmt.Fprintf(w, "\nNo scaling configuration was set\n")
 		} else {
-			fmt.Fprintf(w, "\n- %s\t%s\n", "scaling max", fn.Scaling.GetMax())
-			fmt.Fprintf(w, "- %s\t%s\n", "scaling min", fn.Scaling.GetMin())
+			fmt.Fprintf(w, "\n- %s\t%s\n", "scaling min/max", fmt.Sprintf("(%s / %s)", fn.Scaling.GetMin(), fn.Scaling.GetMax()))
 			fmt.Fprintf(w, "- %s\t%s\n", "scaling type", fn.Scaling.GetType())
 			fmt.Fprintf(w, "- %s\t%s\n", "scaling target", fn.Scaling.GetTarget())
 			fmt.Fprintf(w, "- %s\t%s\n", "scaling target-proportion", fn.Scaling.GetProportion())

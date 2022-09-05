@@ -26,7 +26,23 @@ Functions:
 
 Confidential data, secrets, other environment variables.
 
-## Run the job and collect the results
+## Run the job and collect the results (automated)
+
+```bash
+arkade get run-job
+
+curl -SLs https://github.com/openfaas/config-checker/blob/master/main.go -o /tmp/job.yaml
+
+# Output to file with today's date
+run-job \
+    -f /tmp/job.yaml \
+    -o $(date '+%Y-%m-%d_%H_%M_%S').txt
+
+# Or print to console:
+run-job -f /tmp/job.yaml
+```
+
+## Run the job and collect the results (with kubectl only)
 
 For run of the tool, run all steps 1-3.
 
