@@ -1,0 +1,18 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: checker
+  namespace: openfaas
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      name: checker
+    spec:
+      serviceAccount: openfaas-checker
+
+      containers:
+      - name: checker
+        image: docker.io/alexellis2/openfaas-checker:0.0.1
+      restartPolicy: Never
