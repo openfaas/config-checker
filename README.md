@@ -31,15 +31,19 @@ Confidential data, secrets, other environment variables.
 ```bash
 arkade get run-job
 
-curl -SLs https://github.com/openfaas/config-checker/blob/master/main.go -o /tmp/job.yaml
+curl -SLs -f https://github.com/alexellis/run-job/blob/master/job.yaml -o /tmp/job.yaml
 
 # Output to file with today's date
 run-job \
     -f /tmp/job.yaml \
-    -o $(date '+%Y-%m-%d_%H_%M_%S').txt
+    --out $(date '+%Y-%m-%d_%H_%M_%S').txt
 
 # Or print to console:
 run-job -f /tmp/job.yaml
+
+# run-job will try to run `pwd`/job.yaml, so you can also skip the argument
+cd /tmp/
+run-job
 ```
 
 ## Run the job and collect the results (with kubectl only)
