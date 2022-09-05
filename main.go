@@ -66,7 +66,7 @@ type Function struct {
 
 func (f *Function) GetMaxInflight() string {
 	if f.MaxInflight != nil {
-		return fmt.Sprintf("%d", f.MaxInflight)
+		return fmt.Sprintf("%d", *f.MaxInflight)
 	}
 	return "<not set>"
 }
@@ -80,13 +80,27 @@ func (f *Function) GetMaxInflight() string {
 //
 // https://docs.openfaas.com/architecture/autoscaling/
 type Scaling struct {
-	Min          int
-	Max          int
+	Min          *int
+	Max          *int
 	Type         string
 	Target       string
 	Proportion   string
 	Zero         string
 	ZeroDuration string
+}
+
+func (s *Scaling) GetMax() string {
+	if s.Max != nil {
+		return fmt.Sprintf("%d", *s.Max)
+	}
+	return "<not set>"
+}
+
+func (s *Scaling) GetMin() string {
+	if s.Min != nil {
+		return fmt.Sprintf("%d", *s.Min)
+	}
+	return "<not set>"
 }
 
 func (s *Scaling) GetType() string {
@@ -101,6 +115,27 @@ func (s *Scaling) GetTarget() string {
 		return "<not set>"
 	}
 	return s.Target
+}
+
+func (s *Scaling) GetProportion() string {
+	if len(s.Proportion) == 0 {
+		return "<not set>"
+	}
+	return s.Proportion
+}
+
+func (s *Scaling) GetZero() string {
+	if len(s.Zero) == 0 {
+		return "<not set>"
+	}
+	return s.Zero
+}
+
+func (s *Scaling) GetZeroDuration() string {
+	if len(s.ZeroDuration) == 0 {
+		return "<not set>"
+	}
+	return s.ZeroDuration
 }
 
 func newTimeout() *Timeout {
@@ -384,8 +419,16 @@ func printFunction(fn Function, autoscaling bool) {
 	w := tabwriter.NewWriter(&b, 0, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "%s\t(%d replicas)\n\n", fn.Name, fn.Replicas)
 
-	fmt.Fprintf(w, "- %s\t%s\n", "read_timeout", fn.Timeout.ReadTimeout)
-	fmt.Fprintf(w, "- %s\t%s\n", "write_timeout", fn.Timeout.WriteTimeout)
+	if len(fn.Timeout.ReadTimeout) > 0 {
+		fmt.Fprintf(w, "- %s\t%s\n", "read_timeout", fn.Timeout.ReadTimeout)
+	} else {
+		fmt.Fprintf(w, "- %s\t%s\n", "read_timeout", "<not set>")
+	}
+	if len(fn.Timeout.WriteTimeout) > 0 {
+		fmt.Fprintf(w, "- %s\t%s\n", "write_timeout", fn.Timeout.WriteTimeout)
+	} else {
+		fmt.Fprintf(w, "- %s\t%s\n", "write_timeout", "<not set>")
+	}
 	if v, ok := fn.Timeout.Additional["exec_timeout"]; ok {
 		fmt.Fprintf(w, "- %s\t%s\n", "exec_timeout", v)
 	} else {
@@ -393,8 +436,17 @@ func printFunction(fn Function, autoscaling bool) {
 	}
 
 	if autoscaling {
-		fmt.Fprintf(w, "- %s\t%s\n", "scaling type", fn.Scaling.GetType())
-		fmt.Fprintf(w, "- %s\t%s\n", "scaling target", fn.Scaling.GetTarget())
+		if fn.Scaling == nil {
+			fmt.Fprintf(w, "\nNo scaling configuration was set\n")
+		} else {
+			fmt.Fprintf(w, "\n- %s\t%s\n", "scaling max", fn.Scaling.GetMax())
+			fmt.Fprintf(w, "- %s\t%s\n", "scaling min", fn.Scaling.GetMin())
+			fmt.Fprintf(w, "- %s\t%s\n", "scaling type", fn.Scaling.GetType())
+			fmt.Fprintf(w, "- %s\t%s\n", "scaling target", fn.Scaling.GetTarget())
+			fmt.Fprintf(w, "- %s\t%s\n", "scaling target-proportion", fn.Scaling.GetProportion())
+			fmt.Fprintf(w, "- %s\t%s\n", "scaling zero", fn.Scaling.GetZero())
+			fmt.Fprintf(w, "- %s\t%s\n", "scaling zero-duration", fn.Scaling.GetZeroDuration())
+		}
 	}
 
 	fmt.Fprintln(w)
@@ -410,20 +462,85 @@ func readFunctions(deps []v1.Deployment) []Function {
 		function := Function{
 			Name:     dep.Name,
 			Timeout:  newTimeout(),
-			Scaling:  &Scaling{},
 			Replicas: int(*dep.Spec.Replicas),
 		}
 
-		for _, container := range dep.Spec.Template.Spec.Containers {
-			for _, env := range container.Env {
-				if env.Name == "max_inflight" {
-					// maxInflight, err := strconv.Atoi(env.Value)
-					// if err != nil {
+		functionContainer := dep.Spec.Template.Spec.Containers[0]
 
-					// }
-					// function.MaxInflight = stenv.Value
+		for _, env := range functionContainer.Env {
+			if env.Name == "max_inflight" {
+				maxInflight, err := strconv.Atoi(env.Value)
+				if err == nil {
+					function.MaxInflight = &maxInflight
 				}
 			}
+
+			if env.Name == "read_timeout" {
+				function.Timeout.ReadTimeout = env.Value
+			}
+			if env.Name == "write_timeout" {
+				function.Timeout.WriteTimeout = env.Value
+			}
+			if env.Name == "exec_timeout" {
+				function.Timeout.Additional["exec_timeout"] = env.Value
+			}
+		}
+
+		labels := dep.Spec.Template.Labels
+		scaleMax, ok := labels["com.openfaas.scale.max"]
+		if ok {
+			v, err := strconv.Atoi(scaleMax)
+			if err == nil {
+				if function.Scaling == nil {
+					function.Scaling = &Scaling{}
+				}
+				function.Scaling.Max = &v
+			}
+		}
+		scaleMin, ok := labels["com.openfaas.scale.min"]
+		if ok {
+			v, err := strconv.Atoi(scaleMin)
+			if err == nil {
+				if function.Scaling == nil {
+					function.Scaling = &Scaling{}
+				}
+				function.Scaling.Min = &v
+			}
+		}
+		scaleType, ok := labels["com.openfaas.scale.type"]
+		if ok {
+			if function.Scaling == nil {
+				function.Scaling = &Scaling{}
+			}
+			function.Scaling.Type = scaleType
+		}
+		scaleTarget, ok := labels["com.openfaas.scale.target"]
+		if ok {
+			if function.Scaling == nil {
+				function.Scaling = &Scaling{}
+			}
+			function.Scaling.Target = scaleTarget
+		}
+		scaleProportion, ok := labels["com.openfaas.scale.target-proportion"]
+		if ok {
+			if function.Scaling == nil {
+				function.Scaling = &Scaling{}
+			}
+			function.Scaling.Proportion = scaleProportion
+		}
+		scaleZero, ok := labels["com.openfaas.scale.zero"]
+		if ok {
+			if function.Scaling == nil {
+				function.Scaling = &Scaling{}
+			}
+			function.Scaling.Zero = scaleZero
+		}
+		scaleZeroDuration, ok := labels["com.openfaas.scale.zero-duration"]
+		if ok {
+			if function.Scaling == nil {
+				function.Scaling = &Scaling{}
+			}
+			function.Scaling.ZeroDuration = scaleZeroDuration
 		}
 
 		functions = append(functions, function)
