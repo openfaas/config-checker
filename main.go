@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +24,32 @@ type Timeout struct {
 	WriteTimeout string
 	ReadTimeout  string
 	Additional   map[string]string
+}
+
+func (t *Timeout) GetWriteTimeout() time.Duration {
+	r, err := time.ParseDuration(t.WriteTimeout)
+	if err != nil {
+		log.Fatalf("Error parsing write timeout: %v", err)
+	}
+	return r
+}
+func (t *Timeout) GetAdditionalTimeout(key string) (time.Duration, error) {
+	if v, ok := t.Additional[key]; ok {
+		r, err := time.ParseDuration(v)
+		if err != nil {
+			log.Fatalf("Error parsing write timeout: %v", err)
+		}
+		return r, nil
+	}
+	return time.Second * 0, fmt.Errorf("%s not found", key)
+}
+
+func (t *Timeout) GetReadTimeout() time.Duration {
+	r, err := time.ParseDuration(t.WriteTimeout)
+	if err != nil {
+		log.Fatalf("Error parsing write timeout: %v", err)
+	}
+	return r
 }
 
 type Function struct {
@@ -78,7 +105,9 @@ func (s *Scaling) GetTarget() string {
 
 func newTimeout() *Timeout {
 	return &Timeout{
-		Additional: make(map[string]string),
+		Additional:   make(map[string]string),
+		WriteTimeout: "",
+		ReadTimeout:  "",
 	}
 }
 
@@ -227,9 +256,9 @@ func main() {
 	fmt.Printf("controller image: %s\n", controllerImage)
 
 	fmt.Printf("gateway_replicas: %d\n", gatewayReplicas)
-	fmt.Printf("gateway_timeout: %s\n", gatewayTimeout)
+	fmt.Printf("gateway_timeout - read: %s write: %s upstream: %s\n", gatewayTimeout.ReadTimeout, gatewayTimeout.WriteTimeout, gatewayTimeout.Additional["upstream_timeout"])
 	fmt.Printf("controller_mode: %s\n", controllerMode)
-	fmt.Printf("controller_timeout: %s\n", controllerTimeout)
+	fmt.Printf("controller_timeout - read: %s write: %s\n", controllerTimeout.ReadTimeout, controllerTimeout.WriteTimeout)
 
 	fmt.Printf("\nQueue-worker\n\n")
 
@@ -250,8 +279,6 @@ func main() {
 
 		fmt.Printf("dashboard_image: %s", dashboardImage)
 	}
-
-	fmt.Printf("\n")
 
 	proGatewayIcon := "❌"
 	if strings.Contains(gatewayImage, "openfaasltd") {
@@ -299,57 +326,80 @@ Features detected:
 	}
 
 	for _, fn := range functions {
-		var b bytes.Buffer
-		w := tabwriter.NewWriter(&b, 0, 0, 1, ' ', 0)
-		fmt.Fprintf(w, "%s\t(%d replicas)\n\n", fn.Name, fn.Replicas)
-
-		fmt.Fprintf(w, "- %s\t%s\n", "read_timeout", fn.Timeout.ReadTimeout)
-		fmt.Fprintf(w, "- %s\t%s\n", "write_timeout", fn.Timeout.WriteTimeout)
-		if v, ok := fn.Timeout.Additional["exec_timeout"]; ok {
-			fmt.Fprintf(w, "- %s\t%s\n", "exec_timeout", v)
-		} else {
-			fmt.Fprintf(w, "- %s\t%s\n", "exec_timeout", "<not set>")
-		}
-
-		if len(autoscalerImage) > 0 {
-
-			fmt.Fprintf(w, "- %s\t%s\n", "scaling type", fn.Scaling.GetType())
-			fmt.Fprintf(w, "- %s\t%s\n", "scaling target", fn.Scaling.GetTarget())
-		}
-
-		// desc := item.Description
-		// if !verbose {
-		// 	desc = storeRenderDescription(desc)
-		// }
-
-		// fmt.Fprintf(w, "%s\t%s\n", "Description", desc)
-		// fmt.Fprintf(w, "%s\t%s\n", "Image", item.GetImageName(platform))
-		// fmt.Fprintf(w, "%s\t%s\n", "Process", item.Fprocess)
-		// fmt.Fprintf(w, "%s\t%s\n", "Repo URL", item.RepoURL)
-
-		fmt.Fprintln(w)
-		w.Flush()
-		fmt.Print(b.String())
-
+		printFunction(fn, len(autoscalerImage) > 0)
 	}
 
-	// Query objects
+	fmt.Printf("\nWarnings:\n\n")
+	ackWaitDuration, err := time.ParseDuration(queueWorkerAckWait)
+	if err != nil {
+		log.Fatalf("unable to parse queue-worker ack_wait: %s", err)
+	}
 
-	// read_ write_timeout
-	// faas-netes / gateway deployment, the timeouts from both functions
-	// timeouts for each function
+	gwUpstreamTimeout, err := gatewayTimeout.GetAdditionalTimeout("upstream_timeout")
+	if err != nil {
+		log.Fatalf("unable to parse upstream_timeout: %s", err)
+	}
 
-	// ack_wait
-	// queue-worker deployment
+	if ackWaitDuration > gwUpstreamTimeout {
+		fmt.Printf("⚠️ queue-worker ack_wait (%s) must be <= gateway.upstream_timeout (%s)\n", queueWorkerAckWait, gwUpstreamTimeout)
+	}
 
-	// Print with check boxes
+	if (queueWorkerReplicas * queueWorkerMaxInflight) < 100 {
+		fmt.Printf("⚠️ queue-worker maximum concurrency is (%d), this may be too low\n", queueWorkerMaxInflight*queueWorkerReplicas)
+	}
 
-	// RBAC YAML
+	if gatewayReplicas < 3 {
+		fmt.Printf("⚠️ gateway replicas want >= %d but got %d, (not Highly Available (HA))\n", 3, gatewayReplicas)
+	}
 
-	// Deployment or job YAML
+	if queueWorkerReplicas < 3 {
+		fmt.Printf("⚠️ queue-worker replicas want >= %d but got %d, (not Highly Available (HA))\n", 3, queueWorkerReplicas)
+	}
 
-	// Dockerfile / Makefile
+	for _, fn := range functions {
+		if len(fn.Timeout.ReadTimeout) == 0 {
+			fmt.Printf("⚠️ %s read_timeout is not set\n", fn.Name)
+		} else if fn.Timeout.GetReadTimeout() > gwUpstreamTimeout {
+			fmt.Printf("⚠️ function %s read_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, fn.Timeout.ReadTimeout, gwUpstreamTimeout)
+		}
 
+		if len(fn.Timeout.WriteTimeout) == 0 {
+			fmt.Printf("⚠️ %s write_timeout is not set\n", fn.Name)
+		} else if fn.Timeout.GetWriteTimeout() > gwUpstreamTimeout {
+			fmt.Printf("⚠️ function %s write_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, fn.Timeout.WriteTimeout, gwUpstreamTimeout)
+		}
+
+		execTimeout, err := fn.Timeout.GetAdditionalTimeout("exec_timeout")
+		if err != nil {
+			fmt.Printf("⚠️ %s exec_timeout is not set\n", fn.Name)
+		} else if execTimeout > gwUpstreamTimeout {
+			fmt.Printf("⚠️ function %s exec_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, execTimeout, gwUpstreamTimeout)
+		}
+	}
+
+}
+
+func printFunction(fn Function, autoscaling bool) {
+	var b bytes.Buffer
+	w := tabwriter.NewWriter(&b, 0, 0, 1, ' ', 0)
+	fmt.Fprintf(w, "%s\t(%d replicas)\n\n", fn.Name, fn.Replicas)
+
+	fmt.Fprintf(w, "- %s\t%s\n", "read_timeout", fn.Timeout.ReadTimeout)
+	fmt.Fprintf(w, "- %s\t%s\n", "write_timeout", fn.Timeout.WriteTimeout)
+	if v, ok := fn.Timeout.Additional["exec_timeout"]; ok {
+		fmt.Fprintf(w, "- %s\t%s\n", "exec_timeout", v)
+	} else {
+		fmt.Fprintf(w, "- %s\t%s\n", "exec_timeout", "<not set>")
+	}
+
+	if autoscaling {
+		fmt.Fprintf(w, "- %s\t%s\n", "scaling type", fn.Scaling.GetType())
+		fmt.Fprintf(w, "- %s\t%s\n", "scaling target", fn.Scaling.GetTarget())
+	}
+
+	fmt.Fprintln(w)
+	w.Flush()
+	fmt.Print(b.String())
 }
 
 func readFunctions(deps []v1.Deployment) []Function {
