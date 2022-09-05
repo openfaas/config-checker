@@ -28,6 +28,8 @@ Confidential data, secrets, other environment variables.
 
 ## Run the job and collect the results
 
+For run of the tool, run all steps 1-3.
+
 1) Deploy the job:
 
 ```bash
@@ -47,10 +49,9 @@ PODNAME=$(kubectl get po -n openfaas -l controller-uid=$JOBUUID -o name)
 kubectl logs -n openfaas $PODNAME > $(date '+%Y-%m-%d_%H_%M_%S').txt
 ```
 
-Remove the job and its RBAC permissions:
+3) Remove the job and its RBAC permissions:
 
 ```bash
 kubectl delete -f ./artifacts
-
 ```
 

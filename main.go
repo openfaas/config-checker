@@ -153,6 +153,10 @@ func main() {
 	autoscalerImage := ""
 	dashboardImage := ""
 
+	directFunctions := false
+	probeFunctions := false
+	clusterRole := false
+
 	for _, dep := range deps.Items {
 
 		if dep.Name == "queue-worker" {
@@ -186,6 +190,24 @@ func main() {
 						}
 						if env.Name == "upstream_timeout" {
 							gatewayTimeout.Additional["upstream_timeout"] = env.Value
+						}
+						if env.Name == "probe_functions" {
+							probeFunctions, err = strconv.ParseBool(env.Value)
+							if err != nil {
+								log.Fatalf("Error parsing probe_functions: %v, value: %s", err, env.Value)
+							}
+						}
+						if env.Name == "cluster_role" {
+							clusterRole, err = strconv.ParseBool(env.Value)
+							if err != nil {
+								log.Fatalf("Error parsing cluster_role: %v, value: %s", err, env.Value)
+							}
+						}
+						if env.Name == "direct_functions" {
+							directFunctions, err = strconv.ParseBool(env.Value)
+							if err != nil {
+								log.Fatalf("Error parsing direct_functions: %v, value: %s", err, env.Value)
+							}
 						}
 					}
 					gatewayImage = container.Image
@@ -236,6 +258,24 @@ func main() {
 		}
 	}
 
+	namespaces, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	istioDetected := false
+	functionNamespaces := []string{"openfaas-fn"}
+
+	for _, n := range namespaces.Items {
+		if n.Name == "istio-system" {
+			istioDetected = true
+		}
+
+		if _, ok := n.Annotations["openfaas"]; ok {
+			functionNamespaces = append(functionNamespaces, n.Name)
+		}
+	}
+
 	functionDeps, err := clientset.AppsV1().
 		Deployments("openfaas-fn").
 		List(ctx, metav1.ListOptions{})
@@ -266,6 +306,8 @@ func main() {
 	fmt.Printf("queue_worker_replicas: %d\n", queueWorkerReplicas)
 	fmt.Printf("queue_worker_ack_wait: %s\n", queueWorkerAckWait)
 	fmt.Printf("queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
+	fmt.Printf("\n")
+	fmt.Printf("\nFunction namespaces: %v\n\n", strings.TrimRight(strings.Join(functionNamespaces, ", "), ","))
 	fmt.Printf("\n")
 
 	if len(autoscalerImage) > 0 {
@@ -299,16 +341,26 @@ func main() {
 	if len(dashboardImage) > 0 {
 		dashboardIcon = "✅"
 	}
+	gwHAIcon := "❌"
+	if gatewayReplicas >= 3 {
+		gwHAIcon = "✅"
+	}
+	istioIcon := "❌"
+	if istioDetected {
+		istioIcon = "✅"
+	}
 
 	fmt.Printf(`
 Features detected:
 
 - %s Pro gateway
+- %s HA Gateway
 - %s Operator mode
 - %s Autoscaler
 - %s Dashboard
+- %s Istio
 
-`, proGatewayIcon, operatorIcon, autoscalerIcon, dashboardIcon)
+`, proGatewayIcon, gwHAIcon, operatorIcon, autoscalerIcon, dashboardIcon, istioIcon)
 
 	fmt.Printf(`Other:
 
@@ -319,7 +371,7 @@ Features detected:
 
 	fmt.Printf("\n")
 
-	fmt.Printf("\nFunctions:\n\n")
+	fmt.Printf("\nFunctions in (openfaas-fn):\n\n")
 
 	if len(functions) == 0 {
 		fmt.Printf("None detected\n")
@@ -354,6 +406,22 @@ Features detected:
 
 	if queueWorkerReplicas < 3 {
 		fmt.Printf("⚠️ queue-worker replicas want >= %d but got %d, (not Highly Available (HA))\n", 3, queueWorkerReplicas)
+	}
+
+	if istioDetected && directFunctions == false {
+		fmt.Printf("⚠️ Istio detected, but direct_functions is disabled\n")
+	}
+
+	if istioDetected && probeFunctions == false {
+		fmt.Printf("⚠️ Istio detected, but probe_functions is disabled\n")
+	}
+
+	if len(autoscalerImage) > 0 && clusterRole == false {
+		fmt.Printf("⚠️ Autoscaler detected, but cluster_role is disabled - unable to collect CPU/RAM metrics\n")
+	}
+
+	if strings.Contains(gatewayImage, "openfaasltd") && len(autoscalerImage) == 0 {
+		fmt.Printf("⚠️ Pro gateway detected, but autoscaler is not enabled\n")
 	}
 
 	for _, fn := range functions {
