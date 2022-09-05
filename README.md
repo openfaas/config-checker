@@ -1,8 +1,10 @@
-## Configuration Checker for OpenFaaS
+## Check your OpenFaaS Configuration
 
-This is a diagnostic tool for OpenFaaS customers when working with our support team.
+This is a diagnostic tool meant for OpenFaaS users to check the configuration of their Kubernetes cluster. It's written by the team that provide Enteprise Support to paying customers.
 
-It runs inside your cluster to make recommendations on the OpenFaaS core components and on your functions.
+It runs just once (inside your cluster) to check your functions and the way OpenFaaS itself is configured.
+
+See also: [Troubleshooting OpenFaaS](https://docs.openfaas.com/deployment/troubleshooting/)
 
 ## How it works
 
