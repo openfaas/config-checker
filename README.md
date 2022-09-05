@@ -28,6 +28,8 @@ Confidential data, secrets, other environment variables.
 
 ## Run the job and collect the results (automated)
 
+Download [run-job from GitHub](https://github.com/alexellis/run-job) or [use "arkade get"](https://arkade.dev/)
+
 ```bash
 arkade get run-job
 
