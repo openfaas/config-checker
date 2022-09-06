@@ -600,8 +600,7 @@ func printResources(w io.Writer, name string, resources *FunctionResources) {
 		return
 	}
 
-	fmt.Fprintln(w, "\t CPU: "+resources.GetCpu())
-	fmt.Fprintln(w, "\t Memory: "+resources.GetMemory())
+	fmt.Fprintf(w, "\t RAM: %s CPU: %s\n", resources.GetMemory(), resources.GetCpu())
 
 	return
 }
