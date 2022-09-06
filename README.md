@@ -90,3 +90,6 @@ kubectl logs -n openfaas $PODNAME > $(date '+%Y-%m-%d_%H_%M_%S').txt
 kubectl delete -f ./artifacts
 ```
 
+## Making sense of the results
+
+Feel free to get in touch with us to discuss the results: [contact us](https://openfaas.com/support)
