@@ -14,6 +14,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -231,6 +232,7 @@ func main() {
 	controllerTimeout := newTimeout()
 	controllerImage := ""
 	gatewayImage := ""
+	proGateway := false
 
 	queueWorkerImage := ""
 	queueWorkerReplicas := 0
@@ -298,6 +300,7 @@ func main() {
 						}
 					}
 					gatewayImage = container.Image
+					proGateway = isProComponent(container)
 				}
 				if container.Name == "faas-netes" {
 					controllerMode = container.Name
@@ -391,7 +394,7 @@ func main() {
 	}
 
 	proGatewayIcon := "❌"
-	if strings.Contains(gatewayImage, "openfaasltd") {
+	if proGateway {
 		proGatewayIcon = "✅"
 	}
 
@@ -492,7 +495,7 @@ Features detected:
 		fmt.Printf("⚠️ Operator mode is not enabled, OpenFaaS Pro customers should use the OpenFaaS operator\n")
 	}
 
-	if strings.Contains(gatewayImage, "openfaasltd") && len(autoscalerImage) == 0 {
+	if proGateway && len(autoscalerImage) == 0 {
 		fmt.Printf("⚠️ Pro gateway detected, but autoscaler is not enabled\n")
 	}
 
@@ -751,4 +754,22 @@ func getClientset(kubeconfig string) (*kubernetes.Clientset, error) {
 	}
 
 	return clientset, nil
+}
+
+func isProComponent(container corev1.Container) bool {
+	return isProImage(container.Image) || hasLicenseMount(container)
+}
+
+func isProImage(imageName string) bool {
+	return strings.Contains(imageName, "openfaasltd")
+}
+
+func hasLicenseMount(container corev1.Container) bool {
+	for _, mount := range container.VolumeMounts {
+		if mount.Name == "license" {
+			return true
+		}
+	}
+
+	return false
 }
