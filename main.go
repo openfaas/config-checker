@@ -475,12 +475,13 @@ Features detected:
 
 	scalingDown := 0
 	for _, fn := range functions {
+		scalingConfigured := fn.Scaling != nil
 
-		if fn.Scaling.GetZero() == "true" {
+		if scalingConfigured && fn.Scaling.GetZero() == "true" {
 			scalingDown++
 		}
 
-		if fn.Scaling.GetZeroDuration() != "<not set>" {
+		if scalingConfigured && fn.Scaling.GetZeroDuration() != "<not set>" {
 			dur, err := time.ParseDuration(fn.Scaling.GetZeroDuration())
 			if err == nil && dur < time.Minute*5 {
 				fmt.Printf("⚠️ %s scales down after %.2f minutes, this may be too soon, 5 minutes or higher is recommended\n", fn.Name, dur.Minutes())
