@@ -609,7 +609,7 @@ func printFunction(fn Function, autoscaling bool) {
 	fmt.Fprintf(w, "\nresources and limits\n\n")
 
 	printResources(w, "- requests", fn.Requests)
-	printResources(w, "- limits", fn.Requests)
+	printResources(w, "- limits", fn.Limits)
 
 	fmt.Fprintln(w)
 	w.Flush()
