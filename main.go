@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -52,6 +53,25 @@ func (t *Timeout) GetReadTimeout() time.Duration {
 	return r
 }
 
+type FunctionResources struct {
+	Memory string
+	CPU    string
+}
+
+func (r *FunctionResources) GetMemory() string {
+	if r.Memory == "0" {
+		return "<none>"
+	}
+	return r.Memory
+}
+
+func (r *FunctionResources) GetCpu() string {
+	if r.CPU == "0" {
+		return "<none>"
+	}
+	return r.CPU
+}
+
 type Function struct {
 	Name        string
 	MaxInflight *int
@@ -60,8 +80,10 @@ type Function struct {
 	// https://docs.openfaas.com/tutorials/expanded-timeouts/
 	// of-watchdog: exec_timeout
 	// classic-watchdog:
-	Timeout *Timeout
-	Scaling *Scaling
+	Timeout  *Timeout
+	Scaling  *Scaling
+	Requests *FunctionResources
+	Limits   *FunctionResources
 }
 
 func (f *Function) GetMaxInflight() string {
@@ -506,6 +528,10 @@ Features detected:
 		} else if execTimeout > gwUpstreamTimeout {
 			fmt.Printf("⚠️ function %s exec_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, execTimeout, gwUpstreamTimeout)
 		}
+
+		if fn.Requests.Memory == "0" {
+			fmt.Printf("⚠️ %s no memory requests set\n", fn.Name)
+		}
 	}
 
 	if len(functions) > 0 && scalingDown == 0 {
@@ -556,9 +582,28 @@ func printFunction(fn Function, autoscaling bool) {
 		}
 	}
 
+	fmt.Fprintf(w, "\nresources and limits\n\n")
+
+	printResources(w, "- requests", fn.Requests)
+	printResources(w, "- limits", fn.Requests)
+
 	fmt.Fprintln(w)
 	w.Flush()
 	fmt.Print(b.String())
+}
+
+func printResources(w io.Writer, name string, resources *FunctionResources) {
+	fmt.Fprintf(w, name+":")
+
+	if resources.CPU == "0" && resources.Memory == "0" {
+		fmt.Fprintln(w, "\t <none>")
+		return
+	}
+
+	fmt.Fprintln(w, "\t CPU: "+resources.GetCpu())
+	fmt.Fprintln(w, "\t Memory: "+resources.GetMemory())
+
+	return
 }
 
 func readFunctions(deps []v1.Deployment) []Function {
@@ -649,6 +694,18 @@ func readFunctions(deps []v1.Deployment) []Function {
 			}
 			function.Scaling.ZeroDuration = scaleZeroDuration
 		}
+
+		req := &FunctionResources{
+			Memory: functionContainer.Resources.Requests.Memory().String(),
+			CPU:    functionContainer.Resources.Requests.Cpu().String(),
+		}
+		function.Requests = req
+
+		lim := &FunctionResources{
+			Memory: functionContainer.Resources.Limits.Memory().String(),
+			CPU:    functionContainer.Resources.Limits.Cpu().String(),
+		}
+		function.Limits = lim
 
 		functions = append(functions, function)
 	}
