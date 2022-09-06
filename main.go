@@ -245,6 +245,7 @@ func main() {
 	directFunctions := false
 	probeFunctions := false
 	clusterRole := false
+	jetstream := false
 
 	for _, dep := range deps.Items {
 
@@ -262,6 +263,7 @@ func main() {
 						}
 					}
 					queueWorkerImage = container.Image
+					jetstream = strings.Contains(queueWorkerImage, "jetstream-queue-worker")
 				}
 			}
 		}
@@ -420,6 +422,10 @@ func main() {
 	if istioDetected {
 		istioIcon = "✅"
 	}
+	jetstreamIcon := "❌"
+	if jetstream {
+		jetstreamIcon = "✅"
+	}
 
 	fmt.Printf(`
 Features detected:
@@ -429,9 +435,10 @@ Features detected:
 - %s Operator mode
 - %s Autoscaler
 - %s Dashboard
+- %s JetStream
 - %s Istio
 
-`, proGatewayIcon, gwHAIcon, operatorIcon, autoscalerIcon, dashboardIcon, istioIcon)
+`, proGatewayIcon, gwHAIcon, operatorIcon, autoscalerIcon, dashboardIcon, jetstreamIcon, istioIcon)
 
 	fmt.Printf(`Other:
 
@@ -473,6 +480,10 @@ Features detected:
 
 	if gatewayReplicas < 3 {
 		fmt.Printf("⚠️ gateway replicas want >= %d but got %d, (not Highly Available (HA))\n", 3, gatewayReplicas)
+	}
+
+	if !jetstream {
+		fmt.Printf("⚠️ NATS Streaming will be deprecated and replaced with NATS JetStream: https://www.openfaas.com/blog/jetstream-for-openfaas/\n")
 	}
 
 	if queueWorkerReplicas < 3 {
