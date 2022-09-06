@@ -519,20 +519,20 @@ Features detected:
 		if len(fn.Timeout.ReadTimeout) == 0 {
 			fmt.Printf("⚠️ %s read_timeout is not set\n", fn.Name)
 		} else if fn.Timeout.GetReadTimeout() > gwUpstreamTimeout {
-			fmt.Printf("⚠️ function %s read_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, fn.Timeout.ReadTimeout, gwUpstreamTimeout)
+			fmt.Printf("⚠️ %s read_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, fn.Timeout.ReadTimeout, gwUpstreamTimeout)
 		}
 
 		if len(fn.Timeout.WriteTimeout) == 0 {
 			fmt.Printf("⚠️ %s write_timeout is not set\n", fn.Name)
 		} else if fn.Timeout.GetWriteTimeout() > gwUpstreamTimeout {
-			fmt.Printf("⚠️ function %s write_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, fn.Timeout.WriteTimeout, gwUpstreamTimeout)
+			fmt.Printf("⚠️ %s write_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, fn.Timeout.WriteTimeout, gwUpstreamTimeout)
 		}
 
 		execTimeout, err := fn.Timeout.GetAdditionalTimeout("exec_timeout")
 		if err != nil {
 			fmt.Printf("⚠️ %s exec_timeout is not set\n", fn.Name)
 		} else if execTimeout > gwUpstreamTimeout {
-			fmt.Printf("⚠️ function %s exec_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, execTimeout, gwUpstreamTimeout)
+			fmt.Printf("⚠️ %s exec_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, execTimeout, gwUpstreamTimeout)
 		}
 
 		if fn.Requests.Memory == "0" {
