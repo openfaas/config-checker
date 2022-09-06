@@ -78,6 +78,7 @@ kubectl apply -f ./artifacts/
 ```bash
 #!/bin/bash
 
+JOBNAME="checker"
 JOBUUID=$(kubectl get job -n openfaas $JOBNAME -o "jsonpath={.metadata.labels.controller-uid}")
 PODNAME=$(kubectl get po -n openfaas -l controller-uid=$JOBUUID -o name)
 
