@@ -80,10 +80,11 @@ type Function struct {
 	// https://docs.openfaas.com/tutorials/expanded-timeouts/
 	// of-watchdog: exec_timeout
 	// classic-watchdog:
-	Timeout  *Timeout
-	Scaling  *Scaling
-	Requests *FunctionResources
-	Limits   *FunctionResources
+	Timeout                *Timeout
+	Scaling                *Scaling
+	Requests               *FunctionResources
+	Limits                 *FunctionResources
+	ReadOnlyRootFilesystem bool
 }
 
 func (f *Function) GetMaxInflight() string {
@@ -495,9 +496,14 @@ Features detected:
 		fmt.Printf("⚠️ Pro gateway detected, but autoscaler is not enabled\n")
 	}
 
+	noReadonlyRootfs := 0
 	scalingDown := 0
 	for _, fn := range functions {
 		scalingConfigured := fn.Scaling != nil
+
+		if !fn.ReadOnlyRootFilesystem {
+			noReadonlyRootfs++
+		}
 
 		if scalingConfigured && fn.Scaling.GetZero() == "true" {
 			scalingDown++
@@ -536,6 +542,10 @@ Features detected:
 
 	if len(functions) > 0 && scalingDown == 0 {
 		fmt.Printf("⚠️ no functions are configured to scale down, this may be inefficient\n")
+	}
+
+	if noReadonlyRootfs > 0 {
+		fmt.Printf("⚠️ at least one function does not set the file system to read-only\n")
 	}
 }
 
@@ -706,6 +716,8 @@ func readFunctions(deps []v1.Deployment) []Function {
 			CPU:    functionContainer.Resources.Limits.Cpu().String(),
 		}
 		function.Limits = lim
+
+		function.ReadOnlyRootFilesystem = *functionContainer.SecurityContext.ReadOnlyRootFilesystem
 
 		functions = append(functions, function)
 	}
