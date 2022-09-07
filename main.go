@@ -242,6 +242,7 @@ func main() {
 	queueWorkerMaxInflight := 0
 
 	autoscalerImage := ""
+	autoscalerReplicas := 0
 	dashboardImage := ""
 
 	directFunctions := false
@@ -343,6 +344,7 @@ func main() {
 
 		if dep.Name == "autoscaler" {
 			for _, container := range dep.Spec.Template.Spec.Containers {
+				autoscalerReplicas = int(*dep.Spec.Replicas)
 				if container.Name == "autoscaler" {
 					autoscalerImage = container.Image
 				}
@@ -516,6 +518,10 @@ Features detected:
 
 	if len(autoscalerImage) > 0 && clusterRole == false {
 		fmt.Printf("⚠️ Pro autoscaler detected, but cluster_role is disabled - unable to collect CPU/RAM metrics\n")
+	}
+
+	if autoscalerReplicas > 1 {
+		fmt.Printf("⚠️ autoscaler replicas should be 1 to prevent double scaling actions\n")
 	}
 
 	if controllerMode != "operator" {
