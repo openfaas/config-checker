@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -208,6 +209,7 @@ func main() {
 
 	openfaasCoreNamespaceDetected := false
 	functionNamespaces := []string{"openfaas-fn"}
+	sort.Strings(functionNamespaces)
 
 	for _, n := range namespaces.Items {
 		if n.Name == openfaasCoreNamespace {
@@ -454,15 +456,17 @@ Features detected:
 
 	fmt.Printf("\n")
 
-	for namespace, functions := range nsFunctions {
+	for _, namespace := range functionNamespaces {
 		fmt.Printf("\nFunctions in (%s):\n\n", namespace)
+		functions, ok := nsFunctions[namespace]
+		if ok {
+			if len(functions) == 0 {
+				fmt.Printf("None detected\n")
+			}
 
-		if len(functions) == 0 {
-			fmt.Printf("None detected\n")
-		}
-
-		for _, fn := range functions {
-			printFunction(fn, len(autoscalerImage) > 0)
+			for _, fn := range functions {
+				printFunction(fn, len(autoscalerImage) > 0)
+			}
 		}
 	}
 
@@ -517,58 +521,65 @@ Features detected:
 		fmt.Printf("⚠️ Pro gateway detected, but autoscaler is not enabled\n")
 	}
 
-	for namespace, functions := range nsFunctions {
-		noReadonlyRootfs := 0
-		scalingDown := 0
-		for _, fn := range functions {
-			scalingConfigured := fn.Scaling != nil
+	for _, namespace := range functionNamespaces {
+		functions, ok := nsFunctions[namespace]
+		if ok {
+			printFunctionWarnings(functions, namespace, gwUpstreamTimeout)
+		}
+	}
+}
 
-			if !fn.ReadOnlyRootFilesystem {
-				noReadonlyRootfs++
-			}
+func printFunctionWarnings(functions []Function, namespace string, gwUpstreamTimeout time.Duration) {
+	noReadonlyRootfs := 0
+	scalingDown := 0
+	for _, fn := range functions {
+		scalingConfigured := fn.Scaling != nil
 
-			if scalingConfigured && fn.Scaling.GetZero() == "true" {
-				scalingDown++
-			}
+		if !fn.ReadOnlyRootFilesystem {
+			noReadonlyRootfs++
+		}
 
-			if scalingConfigured && fn.Scaling.GetZeroDuration() != "<not set>" {
-				dur, err := time.ParseDuration(fn.Scaling.GetZeroDuration())
-				if err == nil && dur < time.Minute*5 {
-					fmt.Printf("⚠️ %s.%s scales down after %.2f minutes, this may be too soon, 5 minutes or higher is recommended\n", fn.Name, namespace, dur.Minutes())
-				}
-			}
+		if scalingConfigured && fn.Scaling.GetZero() == "true" {
+			scalingDown++
+		}
 
-			if len(fn.Timeout.ReadTimeout) == 0 {
-				fmt.Printf("⚠️ %s.%s read_timeout is not set\n", fn.Name, namespace)
-			} else if fn.Timeout.GetReadTimeout() > gwUpstreamTimeout {
-				fmt.Printf("⚠️ %s.%s read_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, namespace, fn.Timeout.ReadTimeout, gwUpstreamTimeout)
-			}
-
-			if len(fn.Timeout.WriteTimeout) == 0 {
-				fmt.Printf("⚠️ %s.%s write_timeout is not set\n", fn.Name, namespace)
-			} else if fn.Timeout.GetWriteTimeout() > gwUpstreamTimeout {
-				fmt.Printf("⚠️ %s.%s write_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, namespace, fn.Timeout.WriteTimeout, gwUpstreamTimeout)
-			}
-
-			execTimeout, err := fn.Timeout.GetAdditionalTimeout("exec_timeout")
-			if err != nil {
-				fmt.Printf("⚠️ %s.%s exec_timeout is not set\n", fn.Name, namespace)
-			} else if execTimeout > gwUpstreamTimeout {
-				fmt.Printf("⚠️ %s.%s exec_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, namespace, execTimeout, gwUpstreamTimeout)
-			}
-
-			if fn.Requests.Memory == "0" {
-				fmt.Printf("⚠️ %s.%s no memory requests set\n", fn.Name, namespace)
+		if scalingConfigured && fn.Scaling.GetZeroDuration() != "<not set>" {
+			dur, err := time.ParseDuration(fn.Scaling.GetZeroDuration())
+			if err == nil && dur < time.Minute*5 {
+				fmt.Printf("⚠️ %s.%s scales down after %.2f minutes, this may be too soon, 5 minutes or higher is recommended\n", fn.Name, namespace, dur.Minutes())
 			}
 		}
 
-		if len(functions) > 0 && scalingDown == 0 {
-			fmt.Printf("⚠️ no functions in namespace %s are configured to scale down, this may be inefficient\n", namespace)
+		if len(fn.Timeout.ReadTimeout) == 0 {
+			fmt.Printf("⚠️ %s.%s read_timeout is not set\n", fn.Name, namespace)
+		} else if fn.Timeout.GetReadTimeout() > gwUpstreamTimeout {
+			fmt.Printf("⚠️ %s.%s read_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, namespace, fn.Timeout.ReadTimeout, gwUpstreamTimeout)
 		}
 
-		if noReadonlyRootfs > 0 {
-			fmt.Printf("⚠️ at least one function in namespace %s does not set the file system to read-only\n", namespace)
+		if len(fn.Timeout.WriteTimeout) == 0 {
+			fmt.Printf("⚠️ %s.%s write_timeout is not set\n", fn.Name, namespace)
+		} else if fn.Timeout.GetWriteTimeout() > gwUpstreamTimeout {
+			fmt.Printf("⚠️ %s.%s write_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, namespace, fn.Timeout.WriteTimeout, gwUpstreamTimeout)
 		}
+
+		execTimeout, err := fn.Timeout.GetAdditionalTimeout("exec_timeout")
+		if err != nil {
+			fmt.Printf("⚠️ %s.%s exec_timeout is not set\n", fn.Name, namespace)
+		} else if execTimeout > gwUpstreamTimeout {
+			fmt.Printf("⚠️ %s.%s exec_timeout (%s) is greater than gateway.upstream_timeout (%s)\n", fn.Name, namespace, execTimeout, gwUpstreamTimeout)
+		}
+
+		if fn.Requests.Memory == "0" {
+			fmt.Printf("⚠️ %s.%s no memory requests set\n", fn.Name, namespace)
+		}
+	}
+
+	if len(functions) > 0 && scalingDown == 0 {
+		fmt.Printf("⚠️ no functions in namespace %s are configured to scale down, this may be inefficient\n", namespace)
+	}
+
+	if noReadonlyRootfs > 0 {
+		fmt.Printf("⚠️ at least one function in namespace %s does not set the file system to read-only\n", namespace)
 	}
 }
 
