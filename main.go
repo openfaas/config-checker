@@ -496,6 +496,10 @@ Features detected:
 		fmt.Printf("⚠️ queue-worker maximum concurrency is (%d), this may be too low\n", queueWorkerMaxInflight*queueWorkerReplicas)
 	}
 
+	if queueWorkerMaxInflight > 500 {
+		fmt.Printf("⚠️ queue-worker max_inflight is (%d), this may be too high\n", queueWorkerMaxInflight)
+	}
+
 	if gatewayReplicas < 3 {
 		fmt.Printf("⚠️ gateway replicas want >= %d but got %d, (not Highly Available (HA))\n", 3, gatewayReplicas)
 	}
