@@ -233,6 +233,7 @@ func main() {
 	controllerMode := ""
 	controllerTimeout := newTimeout()
 	controllerImage := ""
+	controllerSetNonRootUser := false
 	gatewayImage := ""
 	proGateway := false
 
@@ -310,6 +311,12 @@ func main() {
 						if env.Name == "write_timeout" {
 							controllerTimeout.WriteTimeout = env.Value
 						}
+						if env.Name == "set_nonroot_user" {
+							controllerSetNonRootUser, err = strconv.ParseBool(env.Value)
+							if err != nil {
+								log.Fatalf("Error parsing set_nonroot_user: %v, value: %s", err, env.Value)
+							}
+						}
 						if env.Name == "cluster_role" {
 							clusterRole, err = strconv.ParseBool(env.Value)
 							if err != nil {
@@ -323,11 +330,15 @@ func main() {
 					controllerMode = container.Name
 					for _, env := range container.Env {
 						if env.Name == "read_timeout" {
-							if env.Name == "read_timeout" {
-								controllerTimeout.ReadTimeout = env.Value
-							}
-							if env.Name == "write_timeout" {
-								controllerTimeout.WriteTimeout = env.Value
+							controllerTimeout.ReadTimeout = env.Value
+						}
+						if env.Name == "write_timeout" {
+							controllerTimeout.WriteTimeout = env.Value
+						}
+						if env.Name == "set_nonroot_user" {
+							controllerSetNonRootUser, err = strconv.ParseBool(env.Value)
+							if err != nil {
+								log.Fatalf("Error parsing set_nonroot_user: %v, value: %s", err, env.Value)
 							}
 						}
 						if env.Name == "cluster_role" {
@@ -537,6 +548,10 @@ Features detected:
 
 	if proGateway && len(autoscalerImage) == 0 {
 		fmt.Printf("⚠️ Pro gateway detected, but autoscaler is not enabled\n")
+	}
+
+	if controllerSetNonRootUser == false {
+		fmt.Printf("⚠️ Non-root flag is not set for the controller/operator\n")
 	}
 
 	for _, namespace := range functionNamespaces {
