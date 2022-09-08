@@ -237,6 +237,7 @@ func main() {
 	gatewayImage := ""
 	proGateway := false
 
+	asyncEnabled := false
 	queueWorkerImage := ""
 	queueWorkerReplicas := 0
 	queueWorkerAckWait := ""
@@ -256,6 +257,7 @@ func main() {
 		if dep.Name == "queue-worker" {
 			for _, container := range dep.Spec.Template.Spec.Containers {
 				if container.Name == "queue-worker" {
+					asyncEnabled = true
 					queueWorkerReplicas = int(*dep.Spec.Replicas)
 					for _, env := range container.Env {
 						if env.Name == "ack_wait" {
@@ -399,13 +401,16 @@ func main() {
 	fmt.Printf("controller_mode: %s\n", controllerMode)
 	fmt.Printf("controller_timeout - read: %s write: %s\n", controllerTimeout.ReadTimeout, controllerTimeout.WriteTimeout)
 
-	fmt.Printf("\nQueue-worker\n\n")
+	if asyncEnabled {
+		fmt.Printf("\nQueue-worker\n\n")
 
-	fmt.Printf("queue_worker_image: %s\n", queueWorkerImage)
-	fmt.Printf("queue_worker_replicas: %d\n", queueWorkerReplicas)
-	fmt.Printf("queue_worker_ack_wait: %s\n", queueWorkerAckWait)
-	fmt.Printf("queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
-	fmt.Printf("\n")
+		fmt.Printf("queue_worker_image: %s\n", queueWorkerImage)
+		fmt.Printf("queue_worker_replicas: %d\n", queueWorkerReplicas)
+		fmt.Printf("queue_worker_ack_wait: %s\n", queueWorkerAckWait)
+		fmt.Printf("queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
+		fmt.Printf("\n")
+	}
+
 	fmt.Printf("\nFunction namespaces:\n\n")
 	for _, namespace := range functionNamespaces {
 		fmt.Printf("- %s\n", namespace)
@@ -421,6 +426,11 @@ func main() {
 		fmt.Printf("\ndashboard\n\n")
 
 		fmt.Printf("dashboard_image: %s", dashboardImage)
+	}
+
+	asyncIcon := "❌"
+	if asyncEnabled {
+		asyncIcon = "✅"
 	}
 
 	proGatewayIcon := "❌"
@@ -458,6 +468,7 @@ func main() {
 	fmt.Printf(`
 Features detected:
 
+- %s Async
 - %s Pro gateway
 - %s HA Gateway
 - %s Operator mode
@@ -466,7 +477,7 @@ Features detected:
 - %s JetStream
 - %s Istio
 
-`, proGatewayIcon, gwHAIcon, operatorIcon, autoscalerIcon, dashboardIcon, jetstreamIcon, istioIcon)
+`, asyncIcon, proGatewayIcon, gwHAIcon, operatorIcon, autoscalerIcon, dashboardIcon, jetstreamIcon, istioIcon)
 
 	fmt.Printf(`Other:
 
@@ -492,26 +503,33 @@ Features detected:
 	}
 
 	fmt.Printf("\nWarnings:\n\n")
-	ackWaitDuration, err := time.ParseDuration(queueWorkerAckWait)
-	if err != nil {
-		log.Fatalf("unable to parse queue-worker ack_wait: %s", err)
-	}
 
 	gwUpstreamTimeout, err := gatewayTimeout.GetAdditionalTimeout("upstream_timeout")
 	if err != nil {
 		log.Fatalf("unable to parse upstream_timeout: %s", err)
 	}
 
-	if ackWaitDuration > gwUpstreamTimeout {
-		fmt.Printf("⚠️ queue-worker ack_wait (%s) must be <= gateway.upstream_timeout (%s)\n", queueWorkerAckWait, gwUpstreamTimeout)
-	}
+	if asyncEnabled {
+		ackWaitDuration, err := time.ParseDuration(queueWorkerAckWait)
+		if err != nil {
+			log.Fatalf("unable to parse queue-worker ack_wait: %s", err)
+		}
 
-	if (queueWorkerReplicas * queueWorkerMaxInflight) < 100 {
-		fmt.Printf("⚠️ queue-worker maximum concurrency is (%d), this may be too low\n", queueWorkerMaxInflight*queueWorkerReplicas)
-	}
+		if ackWaitDuration > gwUpstreamTimeout {
+			fmt.Printf("⚠️ queue-worker ack_wait (%s) must be <= gateway.upstream_timeout (%s)\n", queueWorkerAckWait, gwUpstreamTimeout)
+		}
 
-	if queueWorkerMaxInflight > 500 {
-		fmt.Printf("⚠️ queue-worker max_inflight is (%d), this may be too high\n", queueWorkerMaxInflight)
+		if (queueWorkerReplicas * queueWorkerMaxInflight) < 100 {
+			fmt.Printf("⚠️ queue-worker maximum concurrency is (%d), this may be too low\n", queueWorkerMaxInflight*queueWorkerReplicas)
+		}
+
+		if queueWorkerMaxInflight > 500 {
+			fmt.Printf("⚠️ queue-worker max_inflight is (%d), this may be too high\n", queueWorkerMaxInflight)
+		}
+
+		if queueWorkerReplicas < 3 {
+			fmt.Printf("⚠️ queue-worker replicas want >= %d but got %d, (not Highly Available (HA))\n", 3, queueWorkerReplicas)
+		}
 	}
 
 	if gatewayReplicas < 3 {
@@ -520,10 +538,6 @@ Features detected:
 
 	if !jetstream {
 		fmt.Printf("⚠️ NATS Streaming will be deprecated and replaced with NATS JetStream: https://www.openfaas.com/blog/jetstream-for-openfaas/\n")
-	}
-
-	if queueWorkerReplicas < 3 {
-		fmt.Printf("⚠️ queue-worker replicas want >= %d but got %d, (not Highly Available (HA))\n", 3, queueWorkerReplicas)
 	}
 
 	if istioDetected && directFunctions == false {
