@@ -251,6 +251,7 @@ func main() {
 	probeFunctions := false
 	clusterRole := false
 	jetstream := false
+	internalNats := false
 
 	for _, dep := range deps.Items {
 
@@ -367,6 +368,13 @@ func main() {
 			for _, container := range dep.Spec.Template.Spec.Containers {
 				if container.Name == "dashboard" {
 					dashboardImage = container.Image
+				}
+			}
+		}
+		if dep.Name == "nats" {
+			for _, container := range dep.Spec.Template.Spec.Containers {
+				if container.Name == "nats" {
+					internalNats = true
 				}
 			}
 		}
@@ -529,6 +537,10 @@ Features detected:
 
 		if queueWorkerReplicas < 3 {
 			fmt.Printf("⚠️ queue-worker replicas want >= %d but got %d, (not Highly Available (HA))\n", 3, queueWorkerReplicas)
+		}
+
+		if internalNats {
+			fmt.Printf("⚠️ Use external NATS to ensure high-availability and persistence\n")
 		}
 	}
 
