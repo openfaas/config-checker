@@ -395,7 +395,10 @@ func main() {
 	fmt.Printf("queue_worker_ack_wait: %s\n", queueWorkerAckWait)
 	fmt.Printf("queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
 	fmt.Printf("\n")
-	fmt.Printf("\nFunction namespaces: %v\n\n", strings.TrimRight(strings.Join(functionNamespaces, ", "), ","))
+	fmt.Printf("\nFunction namespaces:\n\n")
+	for _, namespace := range functionNamespaces {
+		fmt.Printf("- %s\n", namespace)
+	}
 
 	if len(autoscalerImage) > 0 {
 		fmt.Printf("\nautoscaler\n\n")
