@@ -290,12 +290,6 @@ func main() {
 								log.Fatalf("Error parsing probe_functions: %v, value: %s", err, env.Value)
 							}
 						}
-						if env.Name == "cluster_role" {
-							clusterRole, err = strconv.ParseBool(env.Value)
-							if err != nil {
-								log.Fatalf("Error parsing cluster_role: %v, value: %s", err, env.Value)
-							}
-						}
 						if env.Name == "direct_functions" {
 							directFunctions, err = strconv.ParseBool(env.Value)
 							if err != nil {
@@ -315,7 +309,12 @@ func main() {
 						if env.Name == "write_timeout" {
 							controllerTimeout.WriteTimeout = env.Value
 						}
-
+						if env.Name == "cluster_role" {
+							clusterRole, err = strconv.ParseBool(env.Value)
+							if err != nil {
+								log.Fatalf("Error parsing cluster_role: %v, value: %s", err, env.Value)
+							}
+						}
 					}
 					controllerImage = container.Image
 				}
@@ -328,6 +327,12 @@ func main() {
 							}
 							if env.Name == "write_timeout" {
 								controllerTimeout.WriteTimeout = env.Value
+							}
+						}
+						if env.Name == "cluster_role" {
+							clusterRole, err = strconv.ParseBool(env.Value)
+							if err != nil {
+								log.Fatalf("Error parsing cluster_role: %v, value: %s", err, env.Value)
 							}
 						}
 					}
