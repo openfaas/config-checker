@@ -38,7 +38,7 @@ Download [run-job from GitHub](https://github.com/alexellis/run-job) or [use "ar
 
 ```bash
 # Apply the RBAC file
-https://raw.githubusercontent.com/openfaas/config-checker/master/artifacts/rbac.yaml
+kubectl apply -f https://raw.githubusercontent.com/openfaas/config-checker/master/artifacts/rbac.yaml
 
 # Install run-job to run the job and collect the results
 arkade get run-job
@@ -49,16 +49,16 @@ curl -SLs \
   -o /tmp/job.yaml
 
 # Output to file with today's date
-run-job \
+$HOME/.arkade/bin/run-job \
     -f /tmp/job.yaml \
     --out $(date '+%Y-%m-%d_%H_%M_%S').txt
 
 # Or print to console:
-run-job -f /tmp/job.yaml
+$HOME/.arkade/bin/run-job -f /tmp/job.yaml
 
 # run-job will try to run `pwd`/job.yaml, so you can also skip the argument
 cd /tmp/
-run-job
+$HOME/.arkade/bin/run-job
 ```
 
 ## Run the job and collect the results (with kubectl only)
