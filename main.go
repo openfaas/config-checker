@@ -15,6 +15,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/apps/v1"
+	autoscalingV2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -169,6 +170,12 @@ func newTimeout() *Timeout {
 		WriteTimeout: "",
 		ReadTimeout:  "",
 	}
+}
+
+type FunctionHpa struct {
+	MaxReplicas           int32
+	MinReplicas           int32
+	HpaMetricResourceDesc string
 }
 
 func main() {
@@ -381,6 +388,7 @@ func main() {
 	}
 
 	var nsFunctions = make(map[string][]Function)
+	var nsFunctionHpas = make(map[string]map[string][]FunctionHpa)
 
 	for _, namespace := range functionNamespaces {
 		functionDeps, err := clientset.AppsV1().
@@ -392,6 +400,14 @@ func main() {
 		}
 
 		nsFunctions[namespace] = readFunctions(functionDeps.Items)
+		functionHpas, err := clientset.AutoscalingV2().
+			HorizontalPodAutoscalers(namespace).
+			List(ctx, metav1.ListOptions{})
+
+		if err != nil {
+			panic(err)
+		}
+		nsFunctionHpas[namespace] = readFunctionHpas(functionHpas.Items)
 	}
 
 	k8sVer, err := clientset.ServerVersion()
@@ -505,7 +521,7 @@ Features detected:
 			}
 
 			for _, fn := range functions {
-				printFunction(fn, len(autoscalerImage) > 0)
+				printFunction(fn, len(autoscalerImage) > 0, nsFunctionHpas[namespace][fn.Name])
 			}
 		}
 	}
@@ -642,7 +658,7 @@ func printFunctionWarnings(functions []Function, namespace string, gwUpstreamTim
 	}
 }
 
-func printFunction(fn Function, autoscaling bool) {
+func printFunction(fn Function, autoscaling bool, fnHpas []FunctionHpa) {
 	var b bytes.Buffer
 	w := tabwriter.NewWriter(&b, 0, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "%s\t(%d replicas)\n\n", fn.Name, fn.Replicas)
@@ -682,6 +698,14 @@ func printFunction(fn Function, autoscaling bool) {
 				fmt.Fprintf(w, "- %s\t%s\n", "scale to zero", fn.Scaling.GetZero())
 				fmt.Fprintf(w, "- %s\t%s\n", "scale to zero duration", fn.Scaling.GetZeroDuration())
 			}
+		}
+	}
+
+	if len(fnHpas) > 0 {
+		fmt.Fprintf(w, "\nHPA configuration\n")
+		for _, fnHpa := range fnHpas {
+			fmt.Fprintf(w, "\n- %s\t%s\n", "min/max replicas", fmt.Sprintf("(%d / %d)", fnHpa.MaxReplicas, fnHpa.MinReplicas))
+			fmt.Fprintf(w, "\n%s\n", fnHpa.HpaMetricResourceDesc)
 		}
 	}
 
@@ -862,4 +886,33 @@ func hasLicenseMount(container corev1.Container) bool {
 	}
 
 	return false
+}
+
+func readFunctionHpas(hpas []autoscalingV2.HorizontalPodAutoscaler) map[string][]FunctionHpa {
+	var functionHpas = make(map[string][]FunctionHpa)
+	for _, hpa := range hpas {
+		functionHpa := FunctionHpa{}
+		functionName := hpa.Spec.ScaleTargetRef.Name
+
+		maxReplicas := hpa.Spec.MaxReplicas
+		functionHpa.MaxReplicas = maxReplicas
+		minReplicas := hpa.Spec.MinReplicas
+		functionHpa.MinReplicas = *minReplicas
+		resourceTarget := hpa.Spec.Metrics
+		var hpaMetricResourceDesc = ""
+		for _, metricsSpec := range resourceTarget {
+			hpaMetricResourceDesc += fmt.Sprintf("- metrics type : %s\n", metricsSpec.Type)
+			if metricsSpec.Type == "Pods" {
+				hpaMetricResourceDesc += fmt.Sprintf("- metric name : %s\n", metricsSpec.Pods.Metric.Name)
+				hpaMetricResourceDesc += fmt.Sprintf("- selector : %s\n", metricsSpec.Pods.Metric.Selector.String())
+				hpaMetricResourceDesc += fmt.Sprintf("- desc : %s\n", metricsSpec.Pods.Target.String())
+			} else if metricsSpec.Type == "Resource" {
+				hpaMetricResourceDesc += fmt.Sprintf("- name : %s\n", metricsSpec.Resource.Name)
+				hpaMetricResourceDesc += fmt.Sprintf("- desc : %s\n\n", metricsSpec.Resource.Target.String())
+			}
+		}
+		functionHpa.HpaMetricResourceDesc = hpaMetricResourceDesc
+		functionHpas[functionName] = append(functionHpas[functionName], functionHpa)
+	}
+	return functionHpas
 }
