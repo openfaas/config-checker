@@ -70,6 +70,10 @@ For run of the tool, run all steps 1-3.
 ```bash
 #!/bin/bash
 
+git clone --depth=1 https://github.com/openfaas/config-checker
+
+cd config-checker
+
 kubectl apply -f ./artifacts/
 ```
 
