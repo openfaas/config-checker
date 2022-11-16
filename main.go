@@ -401,22 +401,21 @@ func main() {
 
 	fmt.Printf("\nGateway\n\n")
 
-	fmt.Printf("gateway image: %s\n", gatewayImage)
-	fmt.Printf("controller image: %s\n", controllerImage)
+	fmt.Printf("- gateway image: %s\n", gatewayImage)
+	fmt.Printf("- controller image: %s\n", controllerImage)
 
-	fmt.Printf("gateway_replicas: %d\n", gatewayReplicas)
-	fmt.Printf("gateway_timeout - read: %s write: %s upstream: %s\n", gatewayTimeout.ReadTimeout, gatewayTimeout.WriteTimeout, gatewayTimeout.Additional["upstream_timeout"])
-	fmt.Printf("controller_mode: %s\n", controllerMode)
-	fmt.Printf("controller_timeout - read: %s write: %s\n", controllerTimeout.ReadTimeout, controllerTimeout.WriteTimeout)
+	fmt.Printf("- gateway_replicas: %d\n", gatewayReplicas)
+	fmt.Printf("- gateway_timeout - read: %s write: %s upstream: %s\n", gatewayTimeout.ReadTimeout, gatewayTimeout.WriteTimeout, gatewayTimeout.Additional["upstream_timeout"])
+	fmt.Printf("- controller_mode: %s\n", controllerMode)
+	fmt.Printf("- controller_timeout - read: %s write: %s\n", controllerTimeout.ReadTimeout, controllerTimeout.WriteTimeout)
 
 	if asyncEnabled {
 		fmt.Printf("\nQueue-worker\n\n")
 
-		fmt.Printf("queue_worker_image: %s\n", queueWorkerImage)
-		fmt.Printf("queue_worker_replicas: %d\n", queueWorkerReplicas)
-		fmt.Printf("queue_worker_ack_wait: %s\n", queueWorkerAckWait)
-		fmt.Printf("queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
-		fmt.Printf("\n")
+		fmt.Printf("- queue_worker_image: %s\n", queueWorkerImage)
+		fmt.Printf("- queue_worker_replicas: %d\n", queueWorkerReplicas)
+		fmt.Printf("- queue_worker_ack_wait: %s\n", queueWorkerAckWait)
+		fmt.Printf("- queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
 	}
 
 	fmt.Printf("\nFunction namespaces:\n\n")
@@ -425,15 +424,16 @@ func main() {
 	}
 
 	if len(autoscalerImage) > 0 {
-		fmt.Printf("\nautoscaler\n\n")
+		fmt.Printf("\nAutoscaler\n\n")
 
-		fmt.Printf("autoscaler_image: %s", autoscalerImage)
+		fmt.Printf("- autoscaler_image: %s\n", autoscalerImage)
 	}
 
 	if len(dashboardImage) > 0 {
-		fmt.Printf("\ndashboard\n\n")
+		fmt.Printf("\nDashboard\n\n")
 
-		fmt.Printf("dashboard_image: %s", dashboardImage)
+		fmt.Printf("- dashboard_image: %s\n", dashboardImage)
+
 	}
 
 	asyncIcon := "❌"
@@ -645,7 +645,7 @@ func printFunctionWarnings(functions []Function, namespace string, gwUpstreamTim
 func printFunction(fn Function, autoscaling bool) {
 	var b bytes.Buffer
 	w := tabwriter.NewWriter(&b, 0, 0, 1, ' ', 0)
-	fmt.Fprintf(w, "%s\t(%d replicas)\n\n", fn.Name, fn.Replicas)
+	fmt.Fprintf(w, "* %s\t(%d replicas)\n\n", fn.Name, fn.Replicas)
 
 	if len(fn.Timeout.ReadTimeout) > 0 {
 		fmt.Fprintf(w, "- %s\t%s\n", "read_timeout", fn.Timeout.ReadTimeout)
