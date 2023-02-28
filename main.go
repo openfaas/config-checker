@@ -246,6 +246,7 @@ func main() {
 	autoscalerImage := ""
 	autoscalerReplicas := 0
 	dashboardImage := ""
+	dashboardJWTSecret := false
 
 	directFunctions := false
 	probeFunctions := false
@@ -368,6 +369,12 @@ func main() {
 			for _, container := range dep.Spec.Template.Spec.Containers {
 				if container.Name == "dashboard" {
 					dashboardImage = container.Image
+
+					for _, volumeMount := range container.VolumeMounts {
+						if volumeMount.Name == "dashboard-jwt" {
+							dashboardJWTSecret = true
+						}
+					}
 				}
 			}
 		}
@@ -578,6 +585,10 @@ Features detected:
 
 	if controllerSetNonRootUser == false {
 		fmt.Printf("⚠️ Non-root flag is not set for the controller/operator\n")
+	}
+
+	if len(dashboardImage) > 0 && dashboardJWTSecret == false {
+		fmt.Printf("⚠️ Dashboard uses auto generated signing keys: https://docs.openfaas.com/openfaas-pro/dashboard/#create-a-signing-key \n")
 	}
 
 	for _, namespace := range functionNamespaces {
