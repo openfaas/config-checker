@@ -198,6 +198,14 @@ func main() {
 		panic(err)
 	}
 
+	builderDeps, err := clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{
+		LabelSelector: "component=pro-builder,app.kubernetes.io/part-of=openfaas",
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Printf("OpenFaaS Pro Report\n")
 
 	namespaces, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
@@ -253,6 +261,8 @@ func main() {
 	clusterRole := false
 	jetstream := false
 	internalNats := false
+
+	functionBuilder := false
 
 	for _, dep := range deps.Items {
 
@@ -390,6 +400,10 @@ func main() {
 		}
 	}
 
+	if len(builderDeps.Items) > 0 {
+		functionBuilder = true
+	}
+
 	var nsFunctions = make(map[string][]Function)
 
 	for _, namespace := range functionNamespaces {
@@ -426,24 +440,23 @@ func main() {
 		fmt.Printf("queue_worker_replicas: %d\n", queueWorkerReplicas)
 		fmt.Printf("queue_worker_ack_wait: %s\n", queueWorkerAckWait)
 		fmt.Printf("queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
-		fmt.Printf("\n")
+	}
+
+	if len(autoscalerImage) > 0 {
+		fmt.Printf("\nAutoscaler\n\n")
+
+		fmt.Printf("autoscaler_image: %s\n", autoscalerImage)
+	}
+
+	if len(dashboardImage) > 0 {
+		fmt.Printf("\nDashboard\n\n")
+
+		fmt.Printf("dashboard_image: %s\n", dashboardImage)
 	}
 
 	fmt.Printf("\nFunction namespaces:\n\n")
 	for _, namespace := range functionNamespaces {
 		fmt.Printf("- %s\n", namespace)
-	}
-
-	if len(autoscalerImage) > 0 {
-		fmt.Printf("\nautoscaler\n\n")
-
-		fmt.Printf("autoscaler_image: %s", autoscalerImage)
-	}
-
-	if len(dashboardImage) > 0 {
-		fmt.Printf("\ndashboard\n\n")
-
-		fmt.Printf("dashboard_image: %s", dashboardImage)
 	}
 
 	asyncIcon := "❌"
@@ -483,6 +496,16 @@ func main() {
 		jetstreamIcon = "✅"
 	}
 
+	functionBuilderIcon := "❌"
+	if functionBuilder {
+		functionBuilderIcon = "✅"
+	}
+
+	multipleNamespacesIcon := "❌"
+	if len(functionNamespaces) > 0 {
+		multipleNamespacesIcon = "✅"
+	}
+
 	fmt.Printf(`
 Features detected:
 
@@ -494,10 +517,17 @@ Features detected:
 - %s Dashboard
 - %s JetStream
 - %s Istio
-
 `, asyncIcon, proGatewayIcon, gwHAIcon, operatorIcon, autoscalerIcon, dashboardIcon, jetstreamIcon, istioIcon)
 
-	fmt.Printf(`Other:
+	fmt.Printf(`
+Advanced features:
+
+- %s Function Builder API
+- %s Multiple namespaces
+`, functionBuilderIcon, multipleNamespacesIcon)
+
+	fmt.Printf(`
+Other:
 
 - Kubernetes version: %s
 - Asynchronous concurrency (cluster): %d
