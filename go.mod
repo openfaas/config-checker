@@ -1,4 +1,4 @@
-module checker
+module config-checker
 
 go 1.18
 
