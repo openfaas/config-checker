@@ -378,10 +378,13 @@ func main() {
 				}
 			}
 		}
+
 		if dep.Name == "nats" {
 			for _, container := range dep.Spec.Template.Spec.Containers {
 				if container.Name == "nats" {
-					internalNats = true
+					if dep.Labels["app"] == "openfaas" {
+						internalNats = true
+					}
 				}
 			}
 		}
@@ -503,8 +506,15 @@ Features detected:
 
 	fmt.Printf("\n")
 
+	totalFunctions := 0
 	for _, namespace := range functionNamespaces {
-		fmt.Printf("\nFunctions in (%s):\n\n", namespace)
+		totalFunctions += len(nsFunctions[namespace])
+	}
+
+	fmt.Printf("Total functions in cluster: %d\n\n", totalFunctions)
+
+	for _, namespace := range functionNamespaces {
+		fmt.Printf("\n%d functions in (%s):\n\n", len(nsFunctions[namespace]), namespace)
 		functions, ok := nsFunctions[namespace]
 		if ok {
 			if len(functions) == 0 {
