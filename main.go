@@ -250,6 +250,7 @@ func main() {
 	queueWorkerReplicas := 0
 	queueWorkerAckWait := ""
 	queueWorkerMaxInflight := 0
+	queueWorkerTimeout := newTimeout()
 
 	autoscalerImage := ""
 	autoscalerReplicas := 0
@@ -278,6 +279,10 @@ func main() {
 
 						if env.Name == "max_inflight" {
 							queueWorkerMaxInflight, _ = strconv.Atoi(env.Value)
+						}
+
+						if env.Name == "upstream_timeout" {
+							queueWorkerTimeout.Additional["upstream_timeout"] = env.Value
 						}
 					}
 					queueWorkerImage = container.Image
@@ -440,6 +445,14 @@ func main() {
 		fmt.Printf("queue_worker_replicas: %d\n", queueWorkerReplicas)
 		fmt.Printf("queue_worker_ack_wait: %s\n", queueWorkerAckWait)
 		fmt.Printf("queue_worker_max_inflight: %d\n", queueWorkerMaxInflight)
+		if jetstream {
+			queueWorkerUpstreamTimeout, err := queueWorkerTimeout.GetAdditionalTimeout("upstream_timeout")
+			if err != nil {
+				log.Fatalf("unable to parse queue-worker upstream_timeout: %s", err)
+			}
+
+			fmt.Printf("queue_worker_upstream_timeout: %s\n", queueWorkerUpstreamTimeout)
+		}
 	}
 
 	if len(autoscalerImage) > 0 {
@@ -561,7 +574,7 @@ Other:
 
 	gwUpstreamTimeout, err := gatewayTimeout.GetAdditionalTimeout("upstream_timeout")
 	if err != nil {
-		log.Fatalf("unable to parse upstream_timeout: %s", err)
+		log.Fatalf("unable to parse gateway upstream_timeout: %s", err)
 	}
 
 	if asyncEnabled {
@@ -570,8 +583,22 @@ Other:
 			log.Fatalf("unable to parse queue-worker ack_wait: %s", err)
 		}
 
-		if ackWaitDuration > gwUpstreamTimeout {
-			fmt.Printf("⚠️ queue-worker ack_wait (%s) must be <= gateway.upstream_timeout (%s)\n", queueWorkerAckWait, gwUpstreamTimeout)
+		if jetstream {
+			queueWorkerUpstreamTimeout, err := queueWorkerTimeout.GetAdditionalTimeout("upstream_timeout")
+			if err != nil {
+				log.Fatalf("unable to parse queue-worker upstream_timeout: %s", err)
+			}
+
+			if ackWaitDuration < 30*time.Second || ackWaitDuration > 1*time.Minute {
+				fmt.Printf("⚠️ queue-worker ack_wait should be between 30s and 1m as it is extended automatically when using JetStream\n")
+			}
+			if queueWorkerUpstreamTimeout != gwUpstreamTimeout {
+				fmt.Printf("⚠️ queue-worker upstream_timeout (%s) must be equal to gateway.upstream_timeout (%s)\n", queueWorkerUpstreamTimeout, gwUpstreamTimeout)
+			}
+		} else {
+			if ackWaitDuration > gwUpstreamTimeout {
+				fmt.Printf("⚠️ queue-worker ack_wait (%s) must be <= gateway.upstream_timeout (%s)\n", queueWorkerAckWait, gwUpstreamTimeout)
+			}
 		}
 
 		if (queueWorkerReplicas * queueWorkerMaxInflight) < 100 {
@@ -860,7 +887,9 @@ func readFunctions(deps []v1.Deployment) []Function {
 		}
 		function.Limits = lim
 
-		function.ReadOnlyRootFilesystem = *functionContainer.SecurityContext.ReadOnlyRootFilesystem
+		if functionContainer.SecurityContext != nil {
+			function.ReadOnlyRootFilesystem = *functionContainer.SecurityContext.ReadOnlyRootFilesystem
+		}
 
 		functions = append(functions, function)
 	}
