@@ -217,7 +217,6 @@ func main() {
 
 	openfaasCoreNamespaceDetected := false
 	functionNamespaces := []string{"openfaas-fn"}
-	sort.Strings(functionNamespaces)
 
 	for _, n := range namespaces.Items {
 		if n.Name == openfaasCoreNamespace {
@@ -231,6 +230,8 @@ func main() {
 			functionNamespaces = append(functionNamespaces, n.Name)
 		}
 	}
+
+	sort.Strings(functionNamespaces)
 
 	if !openfaasCoreNamespaceDetected {
 		log.Fatalf("OpenFaaS Core namespace \"%s\" not found. Exiting", openfaasCoreNamespace)
@@ -597,8 +598,9 @@ Other:
 			}
 		} else {
 			if ackWaitDuration > gwUpstreamTimeout {
-				fmt.Printf("⚠️ queue-worker ack_wait (%s) must be <= gateway.upstream_timeout (%s)\n", queueWorkerAckWait, gwUpstreamTimeout)
+				fmt.Printf("⚠️ queue-worker ack_wait (%s) must be <= gateway.upstream_timeout when using NATS Streaming (%s)\n", queueWorkerAckWait, gwUpstreamTimeout)
 			}
+			fmt.Printf("⚠️ NATS Steaming is deprecated, switch to NATS JetStream ASAP - https://docs.openfaas.com/openfaas-pro/jetstream\n")
 		}
 
 		if (queueWorkerReplicas * queueWorkerMaxInflight) < 100 {
@@ -782,8 +784,6 @@ func printResources(w io.Writer, name string, resources *FunctionResources) {
 	}
 
 	fmt.Fprintf(w, "\t RAM: %s CPU: %s\n", resources.GetMemory(), resources.GetCpu())
-
-	return
 }
 
 func readFunctions(deps []v1.Deployment) []Function {
