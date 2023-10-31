@@ -5,33 +5,33 @@ mkdir -p ./openfaas
 echo "Gathering diagnostics to: ./openfaas"
 
 # Core service deployment list, and images
-kubectl get -n openfaas deploy -o wide > openfaas/openfaas-core-deploy.txt
+kubectl get -n openfaas deploy -o wide > openfaas/01-openfaas-core-deploy.txt
 
 # ConfigMap and function CRD YAML
-kubectl get -n openfaas configmap -o yaml > openfaas/openfaas-configmaps.yaml
-kubectl get -n openfaas-fn function -o yaml > openfaas/openfaas-function-crd.yaml
+kubectl get -n openfaas configmap -o yaml > openfaas/02-openfaas-configmaps.yaml
+kubectl get -n openfaas-fn function -o yaml > openfaas/03-openfaas-function-crd.yaml
 
 # Function and core service YAML
-kubectl get -n openfaas deploy -o yaml > openfaas/openfaas-deploy.yaml
-kubectl get -n openfaas-fn deploy -o yaml > openfaas/openfaas-fn-deploy.yaml
+kubectl get -n openfaas deploy -o yaml > openfaas/04-openfaas-deploy.yaml
+kubectl get -n openfaas-fn deploy -o yaml > openfaas/05-openfaas-fn-deploy.yaml
 
 # Logs from core services
-kubectl logs -n openfaas deploy/gateway -c operator > openfaas/operator-logs.txt
-kubectl logs -n openfaas deploy/gateway -c gateway > openfaas/gateway-logs.txt
+kubectl logs -n openfaas deploy/gateway -c operator > openfaas/06-operator-logs.txt
+kubectl logs -n openfaas deploy/gateway -c gateway > openfaas/07-gateway-logs.txt
 
 # Events by order from core services
-kubectl get events -n openfaas --sort-by=.metadata.creationTimestamp > openfaas/openfaas-events.txt
-kubectl get events -n openfaas-fn --sort-by=.metadata.creationTimestamp > openfaas/openfaas-fn-events.txt
+kubectl get events -n openfaas --sort-by=.metadata.creationTimestamp > openfaas/08-openfaas-events.txt
+kubectl get events -n openfaas-fn --sort-by=.metadata.creationTimestamp > openfaas/09-openfaas-fn-events.txt
 
 # RBAC 
-kubectl get role -n openfaas > openfaas/role-list.txt
-kubectl get role -n openfaas -o yaml > openfaas/role.yaml
+kubectl get role -n openfaas > openfaas/10-role-list.txt
+kubectl get role -n openfaas -o yaml > openfaas/11-role.yaml
 
-kubectl get clusterrole > openfaas/clusterrole-list.txt
-kubectl get clusterrole -o yaml > openfaas/clusterrole.yaml
+kubectl get clusterrole > openfaas/12-clusterrole-list.txt
+kubectl get clusterrole -o yaml > openfaas/13-clusterrole.yaml
 
-kubectl get serviceaccount -n openfaas > openfaas/serviceaccount-list.txt
-kubectl get serviceaccount -n openfaas -o yaml > openfaas/serviceaccount.yaml
+kubectl get serviceaccount -n openfaas > openfaas/14-serviceaccount-list.txt
+kubectl get serviceaccount -n openfaas -o yaml > openfaas/15-serviceaccount.yaml
 
 echo ""
 
