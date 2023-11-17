@@ -888,7 +888,10 @@ func readFunctions(deps []v1.Deployment) []Function {
 		function.Limits = lim
 
 		if functionContainer.SecurityContext != nil {
-			function.ReadOnlyRootFilesystem = *functionContainer.SecurityContext.ReadOnlyRootFilesystem
+			if functionContainer.SecurityContext.ReadOnlyRootFilesystem != nil {
+				function.ReadOnlyRootFilesystem = *functionContainer.SecurityContext.ReadOnlyRootFilesystem
+			}
+			function.ReadOnlyRootFilesystem = false
 		}
 
 		functions = append(functions, function)
