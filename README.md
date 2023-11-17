@@ -74,6 +74,9 @@ git clone --depth=1 https://github.com/openfaas/config-checker
 
 cd config-checker
 
+# Delete any prior runs
+kubectl delete -f ./artifacts/
+
 kubectl apply -f ./artifacts/
 ```
 
